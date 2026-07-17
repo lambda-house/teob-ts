@@ -1,0 +1,94 @@
+name: Publish to npm
+
+# This workflow publishes @lambda-house/teob-ts to npmjs.com.
+# It runs on GitHub-hosted runners (ubuntu-latest) from the PUBLIC repo.
+#
+# Authentication: OIDC Trusted Publishing (no stored tokens).
+# Configure at: https://www.npmjs.com/package/@lambda-house/teob-ts/settings
+#   → Trusted Publisher → GitHub Actions
+#   → Org: lambda-house, Repo: teob-ts, Workflow: publish-npm.yml
+#
+# First-time bootstrap: use workflow_dispatch with use_token=true
+# and set NPM_TOKEN repo secret. After first publish, configure
+# trusted publisher on npmjs.com and revoke the token.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty for package.json version)'
+        required: false
+        type: string
+      use_token:
+        description: 'Use NPM_TOKEN instead of OIDC (for first-time bootstrap only)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      # OIDC trusted publishing needs npm >= 11.5.1, but npm 12 skips
+      # install scripts by default, which leaves better-sqlite3 without
+      # its native binding — pin to 11.x.
+      - name: Ensure npm 11.x (>= 11.5.1)
+        run: npm install -g npm@11
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run test:ci
+      - run: npm run build
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Set version
+        run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version --allow-same-version
+
+      # Bootstrap publish (first time only, with token)
+      - name: Publish with token (bootstrap)
+        if: ${{ github.event.inputs.use_token == 'true' }}
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Normal publish (OIDC, no token needed)
+      - name: Publish with OIDC
+        if: ${{ github.event.inputs.use_token != 'true' }}
+        run: npm publish --provenance --access public
+
+      - name: Summary
+        run: |
+          echo "### Published to npmjs.com 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** @lambda-house/teob-ts" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          AUTH=$([[ "${{ github.event.inputs.use_token }}" == "true" ]] && echo "Token (bootstrap)" || echo "OIDC Trusted Publishing")
+          echo "**Auth:** $AUTH" >> $GITHUB_STEP_SUMMARY
+          echo "**URL:** https://www.npmjs.com/package/@lambda-house/teob-ts" >> $GITHUB_STEP_SUMMARY
