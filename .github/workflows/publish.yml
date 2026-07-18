@@ -1,0 +1,108 @@
+name: CI & Publish (Nexus)
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty for package.json version)'
+        required: false
+        type: string
+      environment:
+        description: 'Target environment (dev/cit/prod)'
+        required: true
+        default: cit
+        type: string
+
+jobs:
+  test:
+    runs-on:
+      - self-hosted
+      - ${{ inputs.environment || 'cit' }}
+
+    environment:
+      name: ${{ inputs.environment || 'cit' }}
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
+      - name: Run tests (excluding postgres integration tests)
+        run: pnpm run test:ci
+
+  publish:
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on:
+      - self-hosted
+      - ${{ inputs.environment || 'cit' }}
+
+    environment:
+      name: ${{ inputs.environment || 'cit' }}
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Configure npm registry
+        run: |
+          echo "//nexus-api.${{ inputs.environment || 'cit' }}.lh.jacum.com/repository/npm-private/:_auth=$(echo -n '${{ secrets.NEXUS_USERNAME }}:${{ secrets.NEXUS_PASSWORD }}' | base64)" > .npmrc
+          echo "registry=https://nexus-api.${{ inputs.environment || 'cit' }}.lh.jacum.com/repository/npm-private/" >> .npmrc
+
+      - name: Set version
+        run: npm version ${{ steps.version.outputs.VERSION }} --no-git-tag-version --allow-same-version
+
+      - name: Publish
+        run: npm publish
+
+      - name: Summary
+        run: |
+          echo "### Published to Nexus 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** @lambda-house/teob-ts" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ steps.version.outputs.VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** https://nexus-api.${{ inputs.environment || 'cit' }}.lh.jacum.com" >> $GITHUB_STEP_SUMMARY

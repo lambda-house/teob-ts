@@ -1,0 +1,45 @@
+name: Release to Public
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_message:
+        description: 'Commit message for the public release'
+        required: true
+        default: 'Release update'
+        type: string
+
+jobs:
+  release:
+    runs-on:
+      - self-hosted
+      - cit
+
+    environment:
+      name: cit
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout internal repo (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push squashed snapshot to public repo
+        env:
+          PUBLIC_REPO: git@github.com:lambda-house/teob-ts.git
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create an orphan branch with current tree
+          git checkout --orphan release-snapshot
+          git commit -m "${{ inputs.commit_message }}"
+
+          # Force-push to public repo's main branch
+          # This replaces the single-commit history with a new single commit
+          git remote add public "$PUBLIC_REPO"
+          git push public release-snapshot:main --force
