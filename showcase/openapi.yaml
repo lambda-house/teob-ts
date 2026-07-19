@@ -1,0 +1,447 @@
+openapi: 3.1.0
+info:
+  title: TEOB-TS Showcase API
+  description: |
+    Full-stack showcase for the TEOB-TS event-sourcing framework.
+    Demonstrates pure aggregates (Gift Card, Todo), Petri Net flows (Signup),
+    and AI integration (chat with entity-aware tools and knowledge search).
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  # --- Gift Card ---
+  /api/gift-cards/{id}/issue:
+    post:
+      tags: [Gift Card]
+      summary: Issue a new gift card with initial balance
+      parameters:
+        - $ref: '#/components/parameters/GiftCardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  minimum: 0.01
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/gift-cards/{id}/redeem:
+    post:
+      tags: [Gift Card]
+      summary: Redeem (debit) from a gift card
+      parameters:
+        - $ref: '#/components/parameters/GiftCardId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  minimum: 0.01
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/gift-cards/{id}/cancel:
+    post:
+      tags: [Gift Card]
+      summary: Cancel a gift card (forfeit remaining balance)
+      parameters:
+        - $ref: '#/components/parameters/GiftCardId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/gift-cards/{id}:
+    get:
+      tags: [Gift Card]
+      summary: Get gift card balance and status
+      parameters:
+        - $ref: '#/components/parameters/GiftCardId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  balance:
+                    type: number
+                  status:
+                    type: string
+                    enum: [Active, Cancelled, Empty, Unknown]
+
+  # --- Todo ---
+  /api/todos/{listId}/items:
+    post:
+      tags: [Todo]
+      summary: Add item to a todo list
+      parameters:
+        - $ref: '#/components/parameters/ListId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itemId:
+                    type: string
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/todos/{listId}/items/{itemId}/complete:
+    patch:
+      tags: [Todo]
+      summary: Mark item as completed
+      parameters:
+        - $ref: '#/components/parameters/ListId'
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/todos/{listId}/items/{itemId}/uncomplete:
+    patch:
+      tags: [Todo]
+      summary: Mark item as not completed
+      parameters:
+        - $ref: '#/components/parameters/ListId'
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/todos/{listId}/items/{itemId}:
+    delete:
+      tags: [Todo]
+      summary: Remove item from list
+      parameters:
+        - $ref: '#/components/parameters/ListId'
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '400':
+          $ref: '#/components/responses/Rejected'
+
+  /api/todos/{listId}:
+    get:
+      tags: [Todo]
+      summary: Get all items in a todo list
+      parameters:
+        - $ref: '#/components/parameters/ListId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  listId:
+                    type: string
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TodoItem'
+
+  # --- Signup Flow ---
+  /api/signup:
+    post:
+      tags: [Signup Flow]
+      summary: Start a new signup flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 1
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flowId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [processing]
+
+  /api/signup/{flowId}:
+    get:
+      tags: [Signup Flow]
+      summary: Get signup flow state (poll for progress)
+      parameters:
+        - name: flowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  flowId:
+                    type: string
+                  places:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items: {}
+                  transitions:
+                    type: object
+                    additionalProperties:
+                      type: string
+                      enum: [NotStarted, Ongoing, Completed, Failed]
+                  outcome:
+                    type: string
+                    enum: [completed, rejected]
+                    nullable: true
+
+  # --- AI Chat ---
+  /api/chat/sessions:
+    post:
+      tags: [AI Chat]
+      summary: Create a new chat session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                systemPrompt:
+                  type: string
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessionId:
+                    type: string
+
+  /api/chat/sessions/{id}/messages:
+    post:
+      tags: [AI Chat]
+      summary: Send a message and get AI response (may use tools)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                  toolCalls:
+                    type: array
+                    nullable: true
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        result: {}
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '501':
+          description: AI not configured
+
+    get:
+      tags: [AI Chat]
+      summary: Get conversation history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        role:
+                          type: string
+                          enum: [user, assistant]
+                        content:
+                          type: string
+
+  /api/chat/sessions/{id}:
+    delete:
+      tags: [AI Chat]
+      summary: Delete a chat session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/Ok'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # --- System ---
+  /api/describe:
+    get:
+      tags: [System]
+      summary: Describe registered aggregates and capabilities
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  aggregates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        category:
+                          type: string
+                        commands:
+                          type: array
+                          items:
+                            type: string
+                  aiEnabled:
+                    type: boolean
+
+components:
+  parameters:
+    GiftCardId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    ListId:
+      name: listId
+      in: path
+      required: true
+      schema:
+        type: string
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    TodoItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+        title:
+          type: string
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+  responses:
+    Ok:
+      description: Success
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [ok]
+    Rejected:
+      description: Command rejected
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
