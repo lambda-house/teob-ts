@@ -1,0 +1,116 @@
+{
+  "name": "@lambda-house/teob-ts",
+  "version": "0.3.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@11.14.0",
+  "bin": {
+    "teob": "dist/cli/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lambda-house/teob-ts.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./inmem": {
+      "types": "./dist/inmem/index.d.ts",
+      "import": "./dist/inmem/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres/index.d.ts",
+      "import": "./dist/postgres/index.js"
+    },
+    "./service": {
+      "types": "./dist/service/index.d.ts",
+      "import": "./dist/service/index.js"
+    },
+    "./petrinet": {
+      "types": "./dist/petrinet/index.d.ts",
+      "import": "./dist/petrinet/index.js"
+    },
+    "./ai": {
+      "types": "./dist/ai/index.d.ts",
+      "import": "./dist/ai/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    },
+    "./http": {
+      "types": "./dist/http/index.d.ts",
+      "import": "./dist/http/index.js"
+    },
+    "./quickstart": {
+      "types": "./dist/quickstart/index.d.ts",
+      "import": "./dist/quickstart/index.js"
+    },
+    "./projection": {
+      "types": "./dist/projection/index.d.ts",
+      "import": "./dist/projection/index.js"
+    },
+    "./saga": {
+      "types": "./dist/saga/index.d.ts",
+      "import": "./dist/saga/index.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry/index.d.ts",
+      "import": "./dist/telemetry/index.js"
+    },
+    "./sqlite": {
+      "types": "./dist/sqlite/index.d.ts",
+      "import": "./dist/sqlite/index.js"
+    },
+    "./ha": {
+      "types": "./dist/ha/index.d.ts",
+      "import": "./dist/ha/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch test/server.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run --exclude 'workshop/**'",
+    "test:ci": "vitest run --exclude 'test/postgres-*.test.ts' --exclude 'workshop/**'",
+    "test:watch": "vitest --exclude 'workshop/**'",
+    "test:workshop": "vitest run workshop/"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.10",
+    "better-sqlite3": "^12.11.1",
+    "hono": "^4.12.30",
+    "pg": "^8.22.0"
+  },
+  "peerDependencies": {
+    "fast-check": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "fast-check": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "@types/pg": "^8.20.0",
+    "fast-check": "^4.9.0",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
