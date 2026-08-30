@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@lambda-house/teob-ts/core": ["../../src/core/index.ts"],
+      "@lambda-house/teob-ts/projection": ["../../src/projection/index.ts"],
+      "@lambda-house/teob-ts/quickstart": ["../../src/quickstart/index.ts"]
+    }
+  },
+  "include": ["./*.ts"]
+}
